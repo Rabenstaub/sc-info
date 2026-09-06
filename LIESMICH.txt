@@ -1,0 +1,119 @@
+SC Info v1.2.0 - Serverdiagnose fuer Star Citizen
+=================================================
+
+Eine Taste druecken - SC Info tippt den Konsolenbefehl selbst ins Spiel,
+fotografiert die Anzeige, liest die Werte aus und bewertet den Server.
+Damit weisst du in zehn Sekunden, ob sich ein Neu-Joinen lohnt.
+
+Die Texterkennung laeuft KOMPLETT LOKAL auf deinem PC (RapidOCR).
+Es geht kein Bild und kein Wert ins Internet.
+
+
+EINRICHTEN (nur einmal)
+-----------------------
+1. Im Spiel die Konsole oeffnen und einmal von Hand eingeben:
+        r_displayinfo 3
+   Rechts oben erscheint die Textanzeige.
+
+2. Start.bat doppelklicken - SC Info geht auf.
+
+3. Auf "Bereich festlegen" klicken. SC Info geht kurz aus dem Weg und
+   zeigt dann ein Foto deines Bildschirms. Ziehe mit gedrueckter
+   Maustaste ein Rechteck um die Textanzeige rechts oben - der gewaehlte
+   Bereich wird dabei hell dargestellt. Esc bricht ab.
+
+   Tipp: Lieber ein bisschen grosszuegiger als zu knapp - fehlende
+   Zeilen kann das Programm nicht erraten.
+
+4. Fertig. Der Bereich wird gespeichert und gilt auch nach einem
+   Neustart weiter.
+
+
+BENUTZEN
+--------
+F6  KOMPLETTER ABLAUF (das Uebliche)
+    SC Info macht selbsttaetig alles nacheinander:
+      Konsole auf -> "r_displayinfo 3" tippen -> Enter -> Konsole zu
+      -> Bereich fotografieren -> auswerten
+    Dauert rund zwei Sekunden. Danach mit Alt+Tab herueberwechseln
+    und das Ergebnis ansehen.
+
+F9  NUR MESSEN
+    Fotografiert und wertet nur aus - fuer den Fall, dass die Anzeige
+    ohnehin schon eingeschaltet ist.
+
+Beide Tasten lassen sich oben im Fenster auf F5 bis F12 umstellen.
+Daneben stellst du ein, mit welcher Taste sich bei dir die Konsole
+oeffnet (Tabulator oder ^ links neben der 1).
+
+"Jetzt messen"    - misst per Mausklick.
+"Bild laden ..."  - wertet einen bereits vorhandenen Screenshot aus
+                    (praktisch fuer Bilder aus dem Spiel-Ordner).
+
+SICHERHEIT BEIM TIPPEN
+    SC Info tippt NUR, wenn Star Citizen wirklich im Vordergrund ist.
+    Steht ein anderes Fenster vorn, passiert nichts und es erscheint
+    ein Hinweis - so kann "r_displayinfo 3" nie in einer E-Mail oder
+    im Chat landen.
+
+    Die Tastendruecke werden genauso erzeugt wie bei VoiceAttack oder
+    AutoHotkey (als Scancodes), damit das Spiel sie sicher annimmt.
+    Dein deutsches Tastaturlayout wird dabei beruecksichtigt.
+
+    Ist die Spielkonsole bereits offen, wenn du F6 drueckst, wuerde
+    der erste Tastendruck sie schliessen - dann einfach nochmal F6.
+
+
+WAS BEWERTET WIRD
+-----------------
+Server-FPS       Der wichtigste Wert. 30 ist derzeit das Maximum.
+                 Unter 15 werden Inventar, NPCs und Missionen zaeh.
+Ping             Verzoegerung zum Server. Unter 50 ms ist sehr gut,
+                 ueber 140 ms merkst du es im Kampf.
+Hitches          Kurze Server-Aussetzer. 0 ist das Ziel.
+Paketverlust     Verlorene Datenpakete - die Ursache vieler Ruckler.
+Spieler          Wie viele auf deiner Shard sind (Grenze rund 500) und
+                 wie viele davon auf deinem Server-Knoten.
+
+Daraus entsteht eine Note von 0 bis 10 und eine klare Empfehlung
+("hier wuerde ich bleiben" / "neu joinen empfohlen"). Zusaetzlich
+werden Region, Aufenthaltsort, Bandbreite, Objektzahl der Simulation
+und deine eigene Bildrate angezeigt - diese fliessen aber nicht in
+die Note ein.
+
+Der VERLAUF unten sammelt jede Messung mit Zeit, Region, Shard-Groesse
+und Note. So siehst du, ob der neue Server wirklich besser ist als der
+alte, und welche Regionen bei dir ueblicherweise gut laufen.
+
+
+WENN ETWAS NICHT KLAPPT
+-----------------------
+"Nichts erkannt" oder Werte fehlen
+    Schau ins Feld "Erkannter Text" ganz unten - dort steht, was das
+    Programm tatsaechlich gelesen hat. Meist ist der Bereich zu klein
+    gezogen oder die Anzeige stand woanders. Bereich neu festlegen.
+
+Das Bild ist schwarz
+    Star Citizen muss im randlosen Fenstermodus laufen (die uebliche
+    Einstellung). Bei echtem Vollbild liefert Windows manchmal ein
+    schwarzes Bild.
+
+Die Taste tut nichts
+    Ein anderes Programm hat sie schon belegt. Oben im Fenster eine
+    andere Taste waehlen (F7-F12).
+
+Einzelne Zahlen sehen falsch aus
+    Der Overlay-Text ist duenn und halbtransparent - die Texterkennung
+    verwechselt gelegentlich Zeichen. Die haeufigen Faelle (0 als @,
+    s als 5) faengt das Programm bereits ab. Zur Kontrolle liegt der
+    letzte Ausschnitt als letzter_screenshot.png im Ordner.
+
+
+DATEIEN IM ORDNER
+-----------------
+sc_info.pyw               Das Programm
+Start.bat                 Startet es
+einstellungen.json        Gemerkter Bildschirmbereich und Taste
+verlauf.json              Alle bisherigen Messungen
+letzter_screenshot.png    Der zuletzt ausgewertete Ausschnitt
+venv\                     Python-Umgebung (nicht anfassen)

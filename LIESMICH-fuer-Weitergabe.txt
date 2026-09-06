@@ -1,0 +1,228 @@
+========================================================
+  SC Info - Serverdiagnose fuer Star Citizen
+========================================================
+
+Eine Taste druecken und in zehn Sekunden wissen, ob der Server taugt
+oder ob sich ein Neu-Joinen lohnt.
+
+SC Info tippt den Konsolenbefehl "r_displayinfo 3" selbst ins Spiel,
+fotografiert die Anzeige oben rechts, liest die Werte aus und bewertet
+den Server mit einer Note von 0 bis 10:
+
+    Server-FPS ...... der wichtigste Wert, 30 ist das Maximum
+    Ping ............ Verzoegerung zum Server
+    Hitches ......... kurze Server-Aussetzer
+    Paketverlust .... die Ursache vieler Ruckler
+    Shard-Groesse ... wie voll deine Spielwelt ist
+
+Dazu ein Verlauf: du siehst sofort, ob der neue Server besser ist als
+der alte - und welche Regionen bei dir ueblicherweise gut laufen.
+
+
+--------------------------------------------------------
+  ERSTER START - bitte einmal lesen
+--------------------------------------------------------
+
+1. Ordner irgendwohin entpacken (z.B. nach C:\Spiele\SC Info).
+   WICHTIG: komplett entpacken, nicht aus dem ZIP heraus starten.
+
+2. "SC Info.exe" doppelklicken.
+
+3. WINDOWS ZEIGT EINE WARNUNG - das ist normal, siehe unten.
+
+4. Star Citizen starten. Im Spiel die Konsole oeffnen und einmal von
+   Hand eingeben:
+        r_displayinfo 3
+   Rechts oben erscheint die Textanzeige.
+
+5. In SC Info auf "Bereich festlegen" klicken. Das Programm geht kurz
+   aus dem Weg und zeigt dann ein Foto deines Bildschirms. Ziehe mit
+   gedrueckter Maustaste ein Rechteck um die Textanzeige rechts oben -
+   der gewaehlte Bereich wird dabei hell dargestellt. Esc bricht ab.
+
+   Tipp: lieber etwas grosszuegiger als zu knapp. Fehlende Zeilen kann
+   das Programm nicht erraten.
+
+6. Fertig. Der Bereich bleibt gespeichert, auch nach einem Neustart.
+
+
+   >>> WICHTIGER TIPP: HELM ABSETZEN <<<
+
+   Miss am besten OHNE Helm. Mit aufgesetztem Helm legt das Spiel
+   HUD-Symbole und Quest-Einblendungen ueber genau die Ecke, in der
+   die Anzeige steht - die Schrift wird dadurch teilweise verdeckt
+   und die Texterkennung liest schlechter.
+
+   Ohne Helm ist die Ecke frei und die Werte werden zuverlaessig
+   gelesen. Am ruhigsten ist es, wenn du dabei nicht gerade fliegst
+   oder eine Mission aktiv ist.
+
+
+--------------------------------------------------------
+  "WINDOWS HAT IHREN PC GESCHUETZT" - was tun?
+--------------------------------------------------------
+
+Diese Meldung erscheint bei JEDEM Programm, das nicht von einer
+gekauften Herausgeber-Signatur begleitet wird (die kostet mehrere
+hundert Euro im Jahr - fuer ein kostenloses Gilden-Werkzeug unnoetig).
+
+    Klick auf "Weitere Informationen"  ->  "Trotzdem ausfuehren"
+
+Manche Virenscanner schlagen zusaetzlich an. Der Grund ist die
+Kombination aus "simuliert Tastendruecke" und "macht Screenshots" -
+technisch dasselbe, was auch VoiceAttack, AutoHotkey oder OBS tun.
+Wer das nicht glauben mag, muss es nicht nutzen: der Quellcode ist
+offen und liegt im selben Download.
+
+
+--------------------------------------------------------
+  BENUTZEN
+--------------------------------------------------------
+
+F6   KOMPLETTER ABLAUF (das Uebliche)
+     Konsole auf -> "r_displayinfo 3" tippen -> Enter -> Konsole zu
+     -> Bereich fotografieren -> auswerten.
+     Dauert rund zwei Sekunden. Danach mit Alt+Tab herueberwechseln
+     und das Ergebnis ansehen.
+
+F9   NUR MESSEN
+     Fotografiert und wertet nur aus, tippt NICHTS ins Spiel.
+     Fuer den Fall, dass die Anzeige ohnehin schon laeuft.
+
+F7   ANZEIGE WIEDER AUS
+     Schickt "r_displayinfo 0" ans Spiel - die Textanzeige oben rechts
+     verschwindet. Zum Weiterspielen ohne Zahlensalat im Bild.
+
+ALT+M   SC INFO VOR / ZURUECK  (fuer alle mit nur EINEM Bildschirm)
+     Einmal druecken: SC Info kommt ueber das Spiel nach vorn, du siehst
+     das Ergebnis. Nochmal druecken: SC Info verschwindet und das Spiel
+     hat sofort wieder den Fokus - kein Alt+Tab-Gefummel noetig.
+     Wer zwei Bildschirme hat, laesst SC Info einfach auf dem zweiten
+     liegen und braucht das nicht.
+
+HAEKCHEN "IMMER IM VORDERGRUND"  (die Alternative fuer einen Bildschirm)
+     SC Info bleibt dann ueber dem Spiel sichtbar, auch waehrend du
+     spielst - wie ein kleines Overlay. Fenster klein ziehen und an
+     einen Rand legen. NICHT ueber die Anzeige oben rechts legen, sonst
+     verdeckt es den Bereich, den SC Info fotografieren muss.
+     Die Tasten funktionieren in diesem Modus ganz normal, auch wenn du
+     gerade ins SC-Info-Fenster geklickt hast.
+
+Alle Tasten lassen sich oben im Fenster umstellen (F5 bis F12 bzw.
+verschiedene Alt-Kombinationen).
+Daneben steht die Konsolentaste - voreingestellt ist ^ (links neben
+der 1), das ist die Standardtaste von Star Citizen. Nur wer die
+Konsole im Spiel umbelegt hat, muss hier etwas aendern.
+
+WICHTIG: Die gewaehlten Tasten gehoeren dann SC Info allein - das
+Spiel bekommt sie nicht mehr. Liegt bei dir also etwas Wichtiges auf
+F6, F7, F9 oder Alt+M, waehle oben eine andere Taste. (F5 ist bewusst NICHT
+voreingestellt: dort liegt in Star Citizen das Pin-System.)
+
+"Hilfe"           - zeigt diese Bedienung im Programm, mit den gerade
+                    eingestellten Tasten.
+"Jetzt messen"    - misst per Mausklick.
+"Bild laden ..."  - wertet einen vorhandenen Screenshot aus.
+
+Die Tasten funktionieren auch, wenn SC Info selbst gerade vorn ist
+(du hast z.B. gerade ins Fenster geklickt): SC Info holt dann kurz das
+Spiel nach vorn, fuehrt die Tastenfolge aus und kommt von selbst wieder
+zurueck. Du musst nicht erst ins Spiel klicken.
+
+
+--------------------------------------------------------
+  ZUM TASTEN-SENDEN - bitte selbst entscheiden
+--------------------------------------------------------
+
+Bei F6 und F7 schickt SC Info Tastendruecke ans Spiel, so wie es VoiceAttack
+oder AutoHotkey auch tun. "r_displayinfo 3" ist ein reiner Anzeige-
+befehl: er zeigt Werte an, die das Spiel ohnehin kennt, und verschafft
+niemandem einen Vorteil.
+
+Trotzdem ist und bleibt das eine eigene Entscheidung. Wem das nicht
+geheuer ist, der schaltet die Anzeige einmal von Hand ein und nutzt
+ausschliesslich F9 - dabei wird garantiert keine einzige Taste ans
+Spiel geschickt.
+
+Zwei Sicherheitsnetze, BEVOR auch nur ein Buchstabe getippt wird:
+
+  1. SC Info tippt NUR, wenn Star Citizen tatsaechlich im Vordergrund
+     ist. Steht ein anderes Fenster vorn, passiert nichts - so kann
+     der Befehl nie in einer E-Mail oder im Chat landen.
+
+  2. SC Info prueft, ob die Konsole wirklich aufgegangen ist. Geht sie
+     nicht auf (falsche Konsolentaste), wird NICHT getippt - sonst
+     wuerden die Buchstaben zu Spielbefehlen (i = Inventar, Leertaste =
+     springen, 3 = Waffe ziehen). Dafuer musst du beim Druecken kurz
+     stillstehen; bewegst du dich, sagt SC Info Bescheid und wartet.
+
+
+--------------------------------------------------------
+  DEINE DATEN BLEIBEN BEI DIR
+--------------------------------------------------------
+
+Die Texterkennung laeuft KOMPLETT auf deinem PC (RapidOCR). Es geht
+kein Bild, kein Messwert und keine Server-Kennung ins Internet. Das
+Programm hat ueberhaupt keine Netzwerkfunktion - es fragt nichts ab,
+meldet nichts, sendet nichts.
+
+Alles, was gespeichert wird, liegt in deinem SC-Info-Ordner:
+    einstellungen.json        dein Bildschirmbereich, deine Tasten
+    verlauf.json              deine bisherigen Messungen
+    letzter_screenshot.png    der zuletzt ausgewertete Ausschnitt
+    sc_info.log               Protokoll fuer die Fehlersuche
+
+
+--------------------------------------------------------
+  WENN ETWAS NICHT KLAPPT
+--------------------------------------------------------
+
+Das Bild ist schwarz
+    Star Citizen muss im RANDLOSEN FENSTERMODUS laufen (die uebliche
+    Einstellung). Bei echtem Vollbild liefert Windows beim Screenshot
+    manchmal ein schwarzes Bild.
+
+Werte fehlen oder sehen falsch aus
+    Erstens: HELM ABSETZEN. Das ist mit Abstand die haeufigste
+    Ursache - HUD-Symbole und Quest-Einblendungen legen sich ueber
+    die Anzeige und verdecken Teile der Schrift.
+    Zweitens: Schau ins Feld "Erkannter Text" ganz unten - dort steht,
+    was das Programm tatsaechlich gelesen hat. Fehlen ganze Zeilen,
+    ist der Bereich zu klein gezogen: "Bereich festlegen" wiederholen.
+    Der Overlay-Text ist duenn und halbtransparent; die haeufigen
+    Verwechslungen (0 als @, s als 5) faengt das Programm bereits ab.
+
+F6 tut nichts
+    Eine andere Anwendung hat die Taste belegt (haeufig: Aufnahme-
+    software). Oben im Fenster eine andere Taste waehlen.
+
+"Die Konsole ist nicht aufgegangen"
+    Pruefe oben rechts die Konsolentaste. In Star Citizen ist es
+    normalerweise ^ (links neben der 1). Ist die Konsole beim Druecken
+    von F6 bereits offen, schliesst der erste Tastendruck sie - dann
+    einfach nochmal.
+
+"Du bewegst dich gerade"
+    Kurz stillstehen (auch die Maus ruhig lassen) und nochmal F6.
+    SC Info braucht ein ruhiges Bild, um zu erkennen, ob die Konsole
+    aufgeht.
+
+Der Start dauert beim ersten Mal lange
+    Beim allerersten Messen wird die Texterkennung geladen. Ab der
+    zweiten Messung geht es deutlich schneller.
+
+Irgendetwas anderes klappt nicht
+    Im SC-Info-Ordner liegt die Datei sc_info.log. Darin steht zu
+    jedem Tastendruck, was das Programm gemacht hat und warum es ggf.
+    abgebrochen hat. Diese Datei (oder die letzten Zeilen daraus)
+    mitschicken, wenn du um Hilfe fragst - dann ist die Ursache meist
+    in einer Minute gefunden.
+
+
+--------------------------------------------------------
+
+Viel Erfolg da draussen, und moegen eure Shards bei 30 FPS laufen.
+
+Kostenlos, ohne Gewaehr, Weitergabe ausdruecklich erwuenscht.
+Star Citizen ist ein Produkt von Cloud Imperium Games. Dieses
+Werkzeug steht in keiner Verbindung zu CIG.

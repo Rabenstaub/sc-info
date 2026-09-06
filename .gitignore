@@ -1,0 +1,24 @@
+# Diese Dateien gehoeren NICHT ins oeffentliche Repository.
+
+# Persoenliche Daten - enthalten deine Shard-Kennungen und Messungen
+einstellungen.json
+verlauf.json
+letzter_screenshot.png
+sc_info.log
+
+# Python-Umgebung und Baureste (riesig, wird beim Bauen neu erzeugt)
+venv/
+build/
+dist/
+__pycache__/
+*.pyc
+
+# Das fertige Paket wird als Release-Datei angehaengt, nicht ins Repo gelegt
+SC-Info-Weitergabe.zip
+
+# Testbilder
+pruefung.png
+icon_vorschau.png
+
+# Private Anleitung fuer den Betreiber, nicht fuers Repository
+ANLEITUNG-Veroeffentlichen.md
