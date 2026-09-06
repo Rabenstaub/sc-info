@@ -7,7 +7,7 @@ Anzeige) fotografiert, der Text lokal ausgelesen (RapidOCR, keine Cloud) und
 als Ampel-Bewertung aufgeschluesselt.
 """
 
-VERSION = "1.5.2"
+VERSION = "1.5.3"
 
 import ctypes
 import json
@@ -860,7 +860,8 @@ SCAN_ENTER = 0x1C
 SCAN_SHIFT = 0x2A
 SCAN_ZIRKUMFLEX = 0x29        # die Taste links neben der 1 (^ bzw. ~)
 
-KONSOLEN_TASTEN = {"^ (links neben 1)": SCAN_ZIRKUMFLEX, "Tabulator": SCAN_TAB}
+# Die Konsole oeffnet in Star Citizen immer mit ^ (links neben der 1).
+KONSOLEN_TASTEN = {"^ (links neben 1)": SCAN_ZIRKUMFLEX}
 
 
 def _sende(scan, los=False, erweitert=False):
@@ -1088,8 +1089,8 @@ class AblaufThread(QThread):
                 protokoll("  abgebrochen: Konsole nicht aufgegangen")
                 self.fehler.emit(
                     "Die Konsole ist nicht aufgegangen – es wurde nichts getippt. "
-                    "Prüfe oben rechts die Konsolentaste: In Star Citizen ist es "
-                    "normalerweise ^ (links neben der 1).")
+                    "War sie vielleicht schon offen? Dann schließt ^ sie – einfach "
+                    "nochmal drücken. Sonst kurz stillstehen und erneut versuchen.")
                 return
 
             text_tippen(self.befehl)
@@ -1300,9 +1301,11 @@ class Fenster(QMainWindow):
                                     self._taste_gewechselt,
                                     "Holt SC Info nach vorn oder schickt es wieder weg - "
                                     "für Spieler mit nur einem Bildschirm")
-        self.konsole_wahl = auswahl("Konsole:", KONSOLEN_TASTEN,
-                                    self.einst.get("konsolen_taste", "^ (links neben 1)"),
-                                    130, self._konsole_gewechselt)
+        konsole = QLabel("Konsole: ^ (links neben der 1)")
+        konsole.setStyleSheet(f"color:{C_DIM};font-size:12.5px;border:none;")
+        konsole.setToolTip("Die Spielkonsole oeffnet in Star Citizen immer mit ^ - "
+                           "diese Taste ist fest.")
+        unten.addWidget(konsole)
         unten.addStretch(1)
         aussen.addLayout(unten)
         return k
@@ -1475,10 +1478,6 @@ class Fenster(QMainWindow):
         einstellungen_speichern(self.einst)
         self._waechter_starten()
         self._status_setzen()
-
-    def _konsole_gewechselt(self, neu):
-        self.einst["konsolen_taste"] = neu
-        einstellungen_speichern(self.einst)
 
     def _waechter_starten(self):
         if self.waechter:
@@ -1756,7 +1755,7 @@ class Fenster(QMainWindow):
         """Bedienungsseite im Programm - nennt die aktuell eingestellten Tasten."""
         e = self.einst
         an, mess, aus = e.get("taste_ablauf", "F6"), e.get("taste", "F9"), e.get("taste_aus", "F7")
-        kombi, konsole = e.get("fenster_kombi", "Alt+M"), e.get("konsolen_taste", "^ (links neben 1)")
+        kombi = e.get("fenster_kombi", "Alt+M")
         html = f"""
         <style>
           body {{ font-family: Segoe UI, sans-serif; font-size: 13.5px; color: {C_TEXT}; }}
@@ -1777,7 +1776,7 @@ class Fenster(QMainWindow):
           <tr><td class="t">{aus}</td><td><b>Anzeige aus.</b> Schickt <i>r_displayinfo 0</i> – die Textanzeige im Spiel verschwindet.</td></tr>
           <tr><td class="t">{kombi}</td><td><b>Fenster vor/zurück.</b> Holt SC Info über das Spiel nach vorn; nochmal drücken schickt es weg und gibt dem Spiel den Fokus zurück. Für Spieler mit nur einem Bildschirm.</td></tr>
         </table>
-        <p class="dim">Konsolentaste: <b>{konsole}</b>. Alle Tasten sind oben im Fenster umstellbar. Die gewählten Tasten gehören SC Info allein – das Spiel bekommt sie nicht mehr.</p>
+        <p class="dim">Die Spielkonsole öffnet SC Info mit <b>^</b> (links neben der 1) – das ist in Star Citizen fest. Alle anderen Tasten sind oben im Fenster umstellbar. Die gewählten Tasten gehören SC Info allein – das Spiel bekommt sie nicht mehr.</p>
 
         <h2>Einmalig einrichten</h2>
         <ol>
@@ -1809,7 +1808,7 @@ class Fenster(QMainWindow):
         <ul>
           <li><b>Werte fehlen:</b> Helm absetzen, dann unten ins Feld „Erkannter Text“ schauen. Fehlen ganze Zeilen, den Bereich neu festlegen.</li>
           <li><b>Bild ist schwarz:</b> Star Citizen im randlosen Fenstermodus laufen lassen (die übliche Einstellung).</li>
-          <li><b>„Konsole ist nicht aufgegangen“:</b> Konsolentaste oben prüfen – normalerweise ^ links neben der 1.</li>
+          <li><b>„Konsole ist nicht aufgegangen“:</b> Meist war die Konsole schon offen (dann schließt ^ sie) – einfach nochmal drücken. Oder du hast dich bewegt: kurz stillstehen.</li>
           <li><b>Alles andere:</b> Im SC-Info-Ordner liegt <i>sc_info.log</i>. Darin steht zu jedem Tastendruck, was passiert ist. Diese Datei mitschicken, wenn du um Hilfe fragst.</li>
         </ul>
         <p class="dim">Alles läuft lokal auf deinem PC – kein Bild, kein Wert geht ins Internet.</p>

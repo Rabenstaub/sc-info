@@ -36,8 +36,8 @@ Alternativ das Häkchen **„Immer im Vordergrund"**: SC Info bleibt dann klein 
 Rand über dem Spiel sichtbar. Nur nicht über die Anzeige oben rechts legen —
 das ist der Bereich, den SC Info fotografieren muss.
 
-Alle Tasten sind oben im Fenster umstellbar. Als Konsolentaste ist `^` (links
-neben der 1) voreingestellt — die Standardtaste von Star Citizen.
+Alle Tasten sind oben im Fenster umstellbar. Die Spielkonsole öffnet SC Info mit
+`^` (links neben der 1) — das ist in Star Citizen fest.
 
 > Die gewählten Tasten gehören dann SC Info allein — das Spiel bekommt sie
 > nicht mehr. F5 ist bewusst nicht voreingestellt, dort liegt in Star Citizen

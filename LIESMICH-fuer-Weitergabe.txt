@@ -110,9 +110,8 @@ HAEKCHEN "IMMER IM VORDERGRUND"  (die Alternative fuer einen Bildschirm)
 
 Alle Tasten lassen sich oben im Fenster umstellen (F5 bis F12 bzw.
 verschiedene Alt-Kombinationen).
-Daneben steht die Konsolentaste - voreingestellt ist ^ (links neben
-der 1), das ist die Standardtaste von Star Citizen. Nur wer die
-Konsole im Spiel umbelegt hat, muss hier etwas aendern.
+Die Spielkonsole oeffnet SC Info mit ^ (links neben der 1) - das ist
+in Star Citizen fest und braucht keine Einstellung.
 
 WICHTIG: Die gewaehlten Tasten gehoeren dann SC Info allein - das
 Spiel bekommt sie nicht mehr. Liegt bei dir also etwas Wichtiges auf
@@ -151,7 +150,7 @@ Zwei Sicherheitsnetze, BEVOR auch nur ein Buchstabe getippt wird:
      der Befehl nie in einer E-Mail oder im Chat landen.
 
   2. SC Info prueft, ob die Konsole wirklich aufgegangen ist. Geht sie
-     nicht auf (falsche Konsolentaste), wird NICHT getippt - sonst
+     nicht auf (z.B. weil sie schon offen war), wird NICHT getippt - sonst
      wuerden die Buchstaben zu Spielbefehlen (i = Inventar, Leertaste =
      springen, 3 = Waffe ziehen). Dafuer musst du beim Druecken kurz
      stillstehen; bewegst du dich, sagt SC Info Bescheid und wartet.
@@ -197,10 +196,9 @@ F6 tut nichts
     software). Oben im Fenster eine andere Taste waehlen.
 
 "Die Konsole ist nicht aufgegangen"
-    Pruefe oben rechts die Konsolentaste. In Star Citizen ist es
-    normalerweise ^ (links neben der 1). Ist die Konsole beim Druecken
-    von F6 bereits offen, schliesst der erste Tastendruck sie - dann
-    einfach nochmal.
+    Meist war die Konsole schon offen - dann schliesst der erste
+    Tastendruck sie. Einfach nochmal druecken. Oder du hast dich
+    bewegt: kurz stillstehen und erneut versuchen.
 
 "Du bewegst dich gerade"
     Kurz stillstehen (auch die Maus ruhig lassen) und nochmal F6.
