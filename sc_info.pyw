@@ -7,7 +7,7 @@ Anzeige) fotografiert, der Text lokal ausgelesen (RapidOCR, keine Cloud) und
 als Ampel-Bewertung aufgeschluesselt.
 """
 
-VERSION = "1.5.1"
+VERSION = "1.5.2"
 
 import ctypes
 import json
@@ -534,6 +534,40 @@ def bewerten(w):
 
 
 # ================================================================== Bereichsauswahl
+def bildschirm_faktor():
+    """
+    Echte Pixel je "logischem" Pixel - die Windows-Skalierung (1.25 bei 125 %).
+
+    Das Fenster (Qt) rechnet in logischen Pixeln, der Screenshot (mss) in echten.
+    Bei 100 % Skalierung ist beides gleich; bei 125 % oder 150 % (ueblich auf
+    grossen Monitoren) waere ohne Umrechnung das Bildschirmfoto vergroessert
+    und verschoben, und der gemerkte Bereich traefe die Anzeige nicht.
+
+    Liefert (faktor, echter Ursprung des Gesamtbildschirms, logische Gesamtflaeche).
+    """
+    gesamt = QRect()
+    for s in QGuiApplication.screens():
+        gesamt = gesamt.united(s.geometry())
+    # Rueckfall: der von Windows gemeldete Faktor des Hauptbildschirms
+    try:
+        rueckfall = float(QGuiApplication.primaryScreen().devicePixelRatio())
+    except Exception:
+        rueckfall = 1.0
+    try:
+        with mss.mss() as sct:
+            mon = sct.monitors[0]              # 0 = alle Bildschirme zusammen, echte Pixel
+        if gesamt.width() > 0:
+            faktor = mon["width"] / gesamt.width()
+            # Windows-Skalierung liegt zwischen 100 % und 350 %. Alles andere ist
+            # ein Messfehler (z.B. Testumgebung ohne echten Bildschirm).
+            if 0.95 <= faktor <= 3.6:
+                return faktor, (mon["left"], mon["top"]), gesamt
+            return rueckfall, (mon["left"], mon["top"]), gesamt
+    except Exception:
+        pass
+    return rueckfall, (gesamt.x(), gesamt.y()), gesamt
+
+
 def pil_zu_pixmap(bild):
     """Wandelt ein PIL-Bild in ein Qt-Bild um (fuer die Anzeige beim Auswaehlen)."""
     roh = bild.tobytes("raw", "RGB")
@@ -552,17 +586,28 @@ class BereichsWaehler(QWidget):
     """
     gewaehlt = pyqtSignal(object)
 
-    def __init__(self, hintergrund, gesamt):
+    def __init__(self, hintergrund, gesamt, faktor=1.0, phys_ursprung=(0, 0)):
         super().__init__()
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint |
                             Qt.WindowType.WindowStaysOnTopHint |
                             Qt.WindowType.Tool)
         self.setCursor(Qt.CursorShape.CrossCursor)
         self.hintergrund = hintergrund
-        self.gesamt = gesamt
+        self.gesamt = gesamt                   # logische Pixel (Fensterkoordinaten)
+        self.faktor = faktor                   # echte Pixel je logischem Pixel
+        self.phys_ursprung = phys_ursprung     # echter Ursprung des Gesamtbildschirms
+        if hintergrund is not None:
+            # Das Foto hat echte Pixel - so gezeichnet, passt es exakt aufs Fenster.
+            hintergrund.setDevicePixelRatio(faktor)
         self.setGeometry(gesamt)
         self.start = None
         self.ende = None
+
+    def _echt(self, r):
+        """Logisches Rechteck im Fenster -> echte Pixel im Foto."""
+        f = self.faktor
+        return QRect(int(round(r.x() * f)), int(round(r.y() * f)),
+                     int(round(r.width() * f)), int(round(r.height() * f)))
 
     def paintEvent(self, _):
         p = QPainter(self)
@@ -577,8 +622,9 @@ class BereichsWaehler(QWidget):
         # 2. Der gewaehlte Bereich in voller Helligkeit.
         if self.start and self.ende:
             r = QRect(self.start, self.ende).normalized()
+            echt = self._echt(r)
             if self.hintergrund:
-                p.drawPixmap(r, self.hintergrund, r)
+                p.drawPixmap(r, self.hintergrund, echt)
             p.setPen(QPen(QColor("#31a0ff"), 2))
             p.drawRect(r)
             p.setPen(QPen(QColor("#ffffff")))
@@ -586,7 +632,7 @@ class BereichsWaehler(QWidget):
             f2.setPointSize(10)
             f2.setBold(True)
             p.setFont(f2)
-            beschriftung = f"{r.width()} x {r.height()} Pixel"
+            beschriftung = f"{echt.width()} x {echt.height()} Pixel"
             oben = r.adjusted(2, -24, 0, 0) if r.top() > 26 else r.adjusted(2, 4, 0, 0)
             p.fillRect(oben.x() - 2, oben.y(), 130, 20, QColor(0, 0, 0, 190))
             p.drawText(oben, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop, beschriftung)
@@ -623,8 +669,10 @@ class BereichsWaehler(QWidget):
         r = QRect(self.start, self.ende).normalized()
         self.close()
         if r.width() > 20 and r.height() > 20:
-            self.gewaehlt.emit((self.gesamt.x() + r.x(), self.gesamt.y() + r.y(),
-                                r.width(), r.height()))
+            echt = self._echt(r)               # Bereich wird in echten Pixeln gemerkt
+            self.gewaehlt.emit((self.phys_ursprung[0] + echt.x(),
+                                self.phys_ursprung[1] + echt.y(),
+                                echt.width(), echt.height()))
         else:
             self.gewaehlt.emit(None)
 
@@ -1556,7 +1604,8 @@ class Fenster(QMainWindow):
         ausblenden = None
         if immer_vorn and not self.isMinimized():
             g = self.frameGeometry()
-            ausblenden = (g.x(), g.y(), g.width(), g.height())
+            f = bildschirm_faktor()[0]     # Fenster ist logisch, Screenshot ist echt
+            ausblenden = (int(g.x() * f), int(g.y() * f), int(g.width() * f), int(g.height() * f))
 
         self.ablauf = AblaufThread(scan, befehl, spiel_hwnd, ausblenden)
         self.ablauf.fertig.connect(danach_und_zurueck)
@@ -1572,17 +1621,17 @@ class Fenster(QMainWindow):
         QTimer.singleShot(400, self._waehler_oeffnen)
 
     def _waehler_oeffnen(self):
-        gesamt = QRect()
-        for s in QGuiApplication.screens():
-            gesamt = gesamt.united(s.geometry())
+        faktor, ursprung, gesamt = bildschirm_faktor()
+        protokoll(f"Bereich festlegen: Skalierung {faktor:.2f}, Bildschirm {gesamt.width()}x{gesamt.height()} logisch")
         try:
-            foto = bereich_fotografieren((gesamt.x(), gesamt.y(),
-                                          gesamt.width(), gesamt.height()))
+            with mss.mss() as sct:
+                roh = sct.grab(sct.monitors[0])    # alle Bildschirme, echte Pixel
+            foto = Image.frombytes("RGB", roh.size, roh.bgra, "raw", "BGRX")
             hintergrund = pil_zu_pixmap(foto)
         except Exception:
             hintergrund = None            # ohne Foto weiter, nur eben ohne Vorschau
 
-        self._waehler = BereichsWaehler(hintergrund, gesamt)
+        self._waehler = BereichsWaehler(hintergrund, gesamt, faktor, ursprung)
         self._waehler.gewaehlt.connect(self._bereich_uebernehmen)
         self._waehler.show()
         self._waehler.activateWindow()
