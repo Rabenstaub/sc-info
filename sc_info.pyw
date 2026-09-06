@@ -7,7 +7,7 @@ Anzeige) fotografiert, der Text lokal ausgelesen (RapidOCR, keine Cloud) und
 als Ampel-Bewertung aufgeschluesselt.
 """
 
-VERSION = "1.5.3"
+VERSION = "1.5.4"
 
 import ctypes
 import json
@@ -596,9 +596,17 @@ class BereichsWaehler(QWidget):
         self.gesamt = gesamt                   # logische Pixel (Fensterkoordinaten)
         self.faktor = faktor                   # echte Pixel je logischem Pixel
         self.phys_ursprung = phys_ursprung     # echter Ursprung des Gesamtbildschirms
-        if hintergrund is not None:
+        if hintergrund is not None and gesamt.width() > 0:
+            # Selbstkorrektur: Das Foto zeigt den GANZEN Bildschirm und muss das
+            # GANZE Fenster fuellen - das Verhaeltnis der beiden Breiten IST der
+            # Faktor, egal was Windows oder Qt ueber Skalierung behaupten.
+            gemessen = hintergrund.width() / gesamt.width()
+            if 0.5 <= gemessen <= 4.0 and abs(gemessen - faktor) > 0.02:
+                protokoll(f"  Skalierung korrigiert: berechnet {faktor:.3f}, "
+                          f"am Foto gemessen {gemessen:.3f} -> nehme {gemessen:.3f}")
+                self.faktor = gemessen
             # Das Foto hat echte Pixel - so gezeichnet, passt es exakt aufs Fenster.
-            hintergrund.setDevicePixelRatio(faktor)
+            hintergrund.setDevicePixelRatio(self.faktor)
         self.setGeometry(gesamt)
         self.start = None
         self.ende = None
@@ -1621,12 +1629,27 @@ class Fenster(QMainWindow):
 
     def _waehler_oeffnen(self):
         faktor, ursprung, gesamt = bildschirm_faktor()
-        protokoll(f"Bereich festlegen: Skalierung {faktor:.2f}, Bildschirm {gesamt.width()}x{gesamt.height()} logisch")
+        protokoll(f"Bereich festlegen: Skalierung {faktor:.3f}, Bildschirm {gesamt.width()}x{gesamt.height()} logisch")
+        # Alle Bildschirmdaten mitschreiben - damit ein Protokoll von einem fremden
+        # Rechner ohne Nachfragen zeigt, was Windows und Qt dort melden.
+        try:
+            for s in QGuiApplication.screens():
+                g = s.geometry()
+                protokoll(f"  Qt-Bildschirm {s.name()!r}: {g.width()}x{g.height()} bei "
+                          f"({g.x()},{g.y()}), Faktor {s.devicePixelRatio():.2f}"
+                          f"{' [Haupt]' if s == QGuiApplication.primaryScreen() else ''}")
+            with mss.mss() as sct:
+                for i, m in enumerate(sct.monitors):
+                    protokoll(f"  Screenshot-Monitor {i}: {m['width']}x{m['height']} bei "
+                              f"({m['left']},{m['top']})")
+        except Exception as e:
+            protokoll(f"  Bildschirmdaten nicht lesbar: {e}")
         try:
             with mss.mss() as sct:
                 roh = sct.grab(sct.monitors[0])    # alle Bildschirme, echte Pixel
             foto = Image.frombytes("RGB", roh.size, roh.bgra, "raw", "BGRX")
             hintergrund = pil_zu_pixmap(foto)
+            protokoll(f"  Foto {foto.width}x{foto.height} echte Pixel")
         except Exception:
             hintergrund = None            # ohne Foto weiter, nur eben ohne Vorschau
 
