@@ -7,7 +7,7 @@ Anzeige) fotografiert, der Text lokal ausgelesen (RapidOCR, keine Cloud) und
 als Ampel-Bewertung aufgeschluesselt.
 """
 
-VERSION = "1.5.4"
+VERSION = "1.5.5"
 
 import ctypes
 import json
@@ -568,6 +568,56 @@ def bildschirm_faktor():
     return rueckfall, (gesamt.x(), gesamt.y()), gesamt
 
 
+def bildschirm_zuordnung():
+    """
+    Ordnet jedem Qt-Bildschirm (logische Pixel, eigener Skalierungsfaktor) den
+    passenden Screenshot-Monitor (echte Pixel) zu.
+
+    Noetig, weil Monitore VERSCHIEDEN skaliert sein koennen (z.B. 5120x1440 mit
+    125 % neben einem USB-Monitor mit 100 %). Ein einzelner Faktor fuer den
+    ganzen Desktop ist dann falsch - jeder Bildschirm braucht seinen eigenen.
+
+    Liefert Liste von (logisches Rechteck, faktor, echtes_links, echtes_oben).
+    """
+    try:
+        with mss.mss() as sct:
+            monitore = [dict(m) for m in sct.monitors[1:]]
+    except Exception:
+        monitore = []
+    ergebnis = []
+    for s in QGuiApplication.screens():
+        g = s.geometry()
+        d = float(s.devicePixelRatio()) or 1.0
+        echt_b, echt_h = int(round(g.width() * d)), int(round(g.height() * d))
+        # passender Monitor: gleiche echte Groesse, dann naechstgelegene Position
+        passend = [m for m in monitore if m["width"] == echt_b and m["height"] == echt_h]
+        if not passend:
+            passend = monitore
+        if passend:
+            m = min(passend, key=lambda m: abs(m["left"] - g.x()) + abs(m["top"] - g.y()))
+            links, oben = m["left"], m["top"]
+        else:
+            links, oben = g.x(), g.y()
+        ergebnis.append((QRect(g), d, links, oben))
+    return ergebnis
+
+
+def logisch_zu_echt(r, zuordnung=None):
+    """Logisches Rechteck (Fenster/Qt) -> echte Pixel, anhand des Bildschirms,
+    auf dem es liegt. Liefert (links, oben, breite, hoehe)."""
+    zuordnung = zuordnung if zuordnung is not None else bildschirm_zuordnung()
+    if not zuordnung:
+        return (r.x(), r.y(), r.width(), r.height())
+    mitte = r.center()
+    treffer = next((z for z in zuordnung if z[0].contains(mitte)), None)
+    if treffer is None:
+        treffer = min(zuordnung, key=lambda z: abs(z[0].center().x() - mitte.x())
+                      + abs(z[0].center().y() - mitte.y()))
+    g, d, links, oben = treffer
+    return (int(round(links + (r.x() - g.x()) * d)), int(round(oben + (r.y() - g.y()) * d)),
+            int(round(r.width() * d)), int(round(r.height() * d)))
+
+
 def pil_zu_pixmap(bild):
     """Wandelt ein PIL-Bild in ein Qt-Bild um (fuer die Anzeige beim Auswaehlen)."""
     roh = bild.tobytes("raw", "RGB")
@@ -577,52 +627,58 @@ def pil_zu_pixmap(bild):
 
 class BereichsWaehler(QWidget):
     """
-    Zeigt ein Foto des Bildschirms und laesst darauf ein Rechteck aufziehen.
+    Zeigt ein Foto der Bildschirme und laesst darauf ein Rechteck aufziehen.
 
     Bewusst NICHT ueber ein durchsichtiges Fenster geloest: Qt malt darunter
     einen undurchsichtigen Hintergrund, dann sieht man nur noch Grau. Ein
     vorher aufgenommenes Bildschirmfoto ist zuverlaessiger - und erlaubt es,
     den gewaehlten Bereich in voller Helligkeit hervorzuheben.
+
+    Jeder Bildschirm bekommt sein EIGENES Foto mit seinem eigenen
+    Skalierungsfaktor - so passt es auch bei Monitoren mit verschiedener
+    Skalierung (z.B. 125 % neben 100 %).
     """
     gewaehlt = pyqtSignal(object)
 
-    def __init__(self, hintergrund, gesamt, faktor=1.0, phys_ursprung=(0, 0)):
+    def __init__(self, fotos, gesamt, zuordnung):
+        """
+        fotos:      Liste von QPixmap je Bildschirm (echte Pixel), gleiche
+                    Reihenfolge wie zuordnung; Eintrag darf None sein
+        gesamt:     logische Gesamtflaeche aller Bildschirme
+        zuordnung:  Ergebnis von bildschirm_zuordnung()
+        """
         super().__init__()
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint |
                             Qt.WindowType.WindowStaysOnTopHint |
                             Qt.WindowType.Tool)
         self.setCursor(Qt.CursorShape.CrossCursor)
-        self.hintergrund = hintergrund
-        self.gesamt = gesamt                   # logische Pixel (Fensterkoordinaten)
-        self.faktor = faktor                   # echte Pixel je logischem Pixel
-        self.phys_ursprung = phys_ursprung     # echter Ursprung des Gesamtbildschirms
-        if hintergrund is not None and gesamt.width() > 0:
-            # Selbstkorrektur: Das Foto zeigt den GANZEN Bildschirm und muss das
-            # GANZE Fenster fuellen - das Verhaeltnis der beiden Breiten IST der
-            # Faktor, egal was Windows oder Qt ueber Skalierung behaupten.
-            gemessen = hintergrund.width() / gesamt.width()
-            if 0.5 <= gemessen <= 4.0 and abs(gemessen - faktor) > 0.02:
-                protokoll(f"  Skalierung korrigiert: berechnet {faktor:.3f}, "
-                          f"am Foto gemessen {gemessen:.3f} -> nehme {gemessen:.3f}")
-                self.faktor = gemessen
-            # Das Foto hat echte Pixel - so gezeichnet, passt es exakt aufs Fenster.
-            hintergrund.setDevicePixelRatio(self.faktor)
+        self.gesamt = gesamt
+        self.zuordnung = zuordnung
+        self.fotos = []
+        for foto, (g, d, _l, _o) in zip(fotos, zuordnung):
+            if foto is not None:
+                foto.setDevicePixelRatio(d)    # echte Pixel -> fuellt genau sein Rechteck
+            self.fotos.append(foto)
         self.setGeometry(gesamt)
         self.start = None
         self.ende = None
 
-    def _echt(self, r):
-        """Logisches Rechteck im Fenster -> echte Pixel im Foto."""
-        f = self.faktor
-        return QRect(int(round(r.x() * f)), int(round(r.y() * f)),
-                     int(round(r.width() * f)), int(round(r.height() * f)))
+    def _fotos_zeichnen(self, p):
+        for foto, (g, _d, _l, _o) in zip(self.fotos, self.zuordnung):
+            if foto is not None:
+                p.drawPixmap(g.x() - self.gesamt.x(), g.y() - self.gesamt.y(), foto)
+
+    def _auswahl_echt(self, r):
+        """Auswahl (fensterlokal) -> echte Pixel des Bildschirms, auf dem sie liegt."""
+        global_r = r.translated(self.gesamt.x(), self.gesamt.y())
+        return logisch_zu_echt(global_r, self.zuordnung)
 
     def paintEvent(self, _):
         p = QPainter(self)
 
-        # 1. Das Bildschirmfoto als Untergrund, leicht abgedunkelt.
-        if self.hintergrund:
-            p.drawPixmap(0, 0, self.hintergrund)
+        # 1. Die Fotos als Untergrund, leicht abgedunkelt.
+        if any(f is not None for f in self.fotos):
+            self._fotos_zeichnen(p)
             p.fillRect(self.rect(), QColor(0, 0, 0, 130))
         else:
             p.fillRect(self.rect(), QColor(20, 25, 32))
@@ -630,9 +686,10 @@ class BereichsWaehler(QWidget):
         # 2. Der gewaehlte Bereich in voller Helligkeit.
         if self.start and self.ende:
             r = QRect(self.start, self.ende).normalized()
-            echt = self._echt(r)
-            if self.hintergrund:
-                p.drawPixmap(r, self.hintergrund, echt)
+            p.save()
+            p.setClipRect(r)
+            self._fotos_zeichnen(p)
+            p.restore()
             p.setPen(QPen(QColor("#31a0ff"), 2))
             p.drawRect(r)
             p.setPen(QPen(QColor("#ffffff")))
@@ -640,7 +697,8 @@ class BereichsWaehler(QWidget):
             f2.setPointSize(10)
             f2.setBold(True)
             p.setFont(f2)
-            beschriftung = f"{echt.width()} x {echt.height()} Pixel"
+            _x, _y, eb, eh = self._auswahl_echt(r)
+            beschriftung = f"{eb} x {eh} Pixel"
             oben = r.adjusted(2, -24, 0, 0) if r.top() > 26 else r.adjusted(2, 4, 0, 0)
             p.fillRect(oben.x() - 2, oben.y(), 130, 20, QColor(0, 0, 0, 190))
             p.drawText(oben, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop, beschriftung)
@@ -677,10 +735,7 @@ class BereichsWaehler(QWidget):
         r = QRect(self.start, self.ende).normalized()
         self.close()
         if r.width() > 20 and r.height() > 20:
-            echt = self._echt(r)               # Bereich wird in echten Pixeln gemerkt
-            self.gewaehlt.emit((self.phys_ursprung[0] + echt.x(),
-                                self.phys_ursprung[1] + echt.y(),
-                                echt.width(), echt.height()))
+            self.gewaehlt.emit(self._auswahl_echt(r))   # in echten Pixeln gemerkt
         else:
             self.gewaehlt.emit(None)
 
@@ -1610,9 +1665,8 @@ class Fenster(QMainWindow):
         # mitzaehlen, sonst wirkt die Konsole "verdeckt" und es wird nicht getippt.
         ausblenden = None
         if immer_vorn and not self.isMinimized():
-            g = self.frameGeometry()
-            f = bildschirm_faktor()[0]     # Fenster ist logisch, Screenshot ist echt
-            ausblenden = (int(g.x() * f), int(g.y() * f), int(g.width() * f), int(g.height() * f))
+            # Fenster ist logisch, Screenshot ist echt - je Bildschirm umrechnen
+            ausblenden = logisch_zu_echt(self.frameGeometry())
 
         self.ablauf = AblaufThread(scan, befehl, spiel_hwnd, ausblenden)
         self.ablauf.fertig.connect(danach_und_zurueck)
@@ -1628,32 +1682,40 @@ class Fenster(QMainWindow):
         QTimer.singleShot(400, self._waehler_oeffnen)
 
     def _waehler_oeffnen(self):
-        faktor, ursprung, gesamt = bildschirm_faktor()
-        protokoll(f"Bereich festlegen: Skalierung {faktor:.3f}, Bildschirm {gesamt.width()}x{gesamt.height()} logisch")
+        zuordnung = bildschirm_zuordnung()
+        gesamt = QRect()
+        for g, _d, _l, _o in zuordnung:
+            gesamt = gesamt.united(g)
+        protokoll(f"Bereich festlegen: {len(zuordnung)} Bildschirm(e), gesamt "
+                  f"{gesamt.width()}x{gesamt.height()} logisch")
         # Alle Bildschirmdaten mitschreiben - damit ein Protokoll von einem fremden
         # Rechner ohne Nachfragen zeigt, was Windows und Qt dort melden.
+        for s in QGuiApplication.screens():
+            g = s.geometry()
+            protokoll(f"  Qt-Bildschirm {s.name()!r}: {g.width()}x{g.height()} bei "
+                      f"({g.x()},{g.y()}), Faktor {s.devicePixelRatio():.2f}"
+                      f"{' [Haupt]' if s == QGuiApplication.primaryScreen() else ''}")
         try:
-            for s in QGuiApplication.screens():
-                g = s.geometry()
-                protokoll(f"  Qt-Bildschirm {s.name()!r}: {g.width()}x{g.height()} bei "
-                          f"({g.x()},{g.y()}), Faktor {s.devicePixelRatio():.2f}"
-                          f"{' [Haupt]' if s == QGuiApplication.primaryScreen() else ''}")
             with mss.mss() as sct:
                 for i, m in enumerate(sct.monitors):
                     protokoll(f"  Screenshot-Monitor {i}: {m['width']}x{m['height']} bei "
                               f"({m['left']},{m['top']})")
         except Exception as e:
-            protokoll(f"  Bildschirmdaten nicht lesbar: {e}")
-        try:
-            with mss.mss() as sct:
-                roh = sct.grab(sct.monitors[0])    # alle Bildschirme, echte Pixel
-            foto = Image.frombytes("RGB", roh.size, roh.bgra, "raw", "BGRX")
-            hintergrund = pil_zu_pixmap(foto)
-            protokoll(f"  Foto {foto.width}x{foto.height} echte Pixel")
-        except Exception:
-            hintergrund = None            # ohne Foto weiter, nur eben ohne Vorschau
+            protokoll(f"  Screenshot-Monitore nicht lesbar: {e}")
 
-        self._waehler = BereichsWaehler(hintergrund, gesamt, faktor, ursprung)
+        fotos = []
+        for g, d, links, oben in zuordnung:
+            try:
+                bild = bereich_fotografieren((links, oben, int(round(g.width() * d)),
+                                              int(round(g.height() * d))))
+                fotos.append(pil_zu_pixmap(bild))
+                protokoll(f"  Foto {bild.width}x{bild.height} echt fuer Bildschirm bei "
+                          f"({g.x()},{g.y()}) logisch, Faktor {d:.2f}")
+            except Exception as e:
+                fotos.append(None)            # ohne Foto weiter, nur eben ohne Vorschau
+                protokoll(f"  Foto fehlgeschlagen: {e}")
+
+        self._waehler = BereichsWaehler(fotos, gesamt, zuordnung)
         self._waehler.gewaehlt.connect(self._bereich_uebernehmen)
         self._waehler.show()
         self._waehler.activateWindow()
