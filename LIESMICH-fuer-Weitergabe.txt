@@ -191,7 +191,14 @@ Werte fehlen oder sehen falsch aus
     Der Overlay-Text ist duenn und halbtransparent; die haeufigen
     Verwechslungen (0 als @, s als 5) faengt das Programm bereits ab.
 
-F6 tut nichts
+Funktionstasten reagieren im Spiel nicht, die Knoepfe schon
+    Dann laeuft Star Citizen als Administrator. Windows liefert einem
+    normalen Programm keine Tasten, solange das Spiel den Fokus hat.
+    SC Info erkennt das und zeigt oben einen roten Knopf "Als
+    Administrator neu starten" (Windows fragt einmal nach). Alternativ
+    das Spiel bzw. den Launcher ohne Administratorrechte starten.
+
+F6 tut nichts, obwohl kein Administrator im Spiel
     Eine andere Anwendung hat die Taste belegt (haeufig: Aufnahme-
     software). Oben im Fenster eine andere Taste waehlen.
 

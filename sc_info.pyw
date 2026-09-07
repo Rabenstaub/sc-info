@@ -7,7 +7,7 @@ Anzeige) fotografiert, der Text lokal ausgelesen (RapidOCR, keine Cloud) und
 als Ampel-Bewertung aufgeschluesselt.
 """
 
-VERSION = "1.5.5"
+VERSION = "1.5.6"
 
 import ctypes
 import json
@@ -842,21 +842,37 @@ class TastenWaechter(QThread):
         self._haken = u32.SetWindowsHookExW(WH_KEYBOARD_LL, self._rueckruf, None, 0)
 
         if not self._haken:
+            protokoll(f"Tastenerkennung: Haken NICHT gesetzt (Fehler {ctypes.get_last_error()}) - Notweg")
             self.fehler.emit("Tastenerkennung konnte nicht gestartet werden")
             self._alter_weg(u32)               # Notweg: klassische Tastenkuerzel
             return
+        protokoll("Tastenerkennung: Haken gesetzt")
 
         # Der Haken braucht eine laufende Nachrichtenschleife in diesem Strang.
+        # Windows entfernt einen Haken still, wenn er unter Last zu langsam
+        # antwortet - darum wird er regelmaessig neu gesetzt (kostet nichts).
         msg = wintypes.MSG()
+        letzte_erneuerung = time.time()
         try:
             while self._laufen:
                 while u32.PeekMessageW(ctypes.byref(msg), None, 0, 0, 1):
                     u32.TranslateMessage(ctypes.byref(msg))
                     u32.DispatchMessageW(ctypes.byref(msg))
+                if time.time() - letzte_erneuerung >= self.ERNEUERN_ALLE:
+                    letzte_erneuerung = time.time()
+                    u32.UnhookWindowsHookEx(self._haken)
+                    self._haken = u32.SetWindowsHookExW(WH_KEYBOARD_LL, self._rueckruf, None, 0)
+                    if not self._haken:
+                        protokoll("Tastenerkennung: Erneuern des Hakens fehlgeschlagen")
+                        self.fehler.emit("Tastenerkennung ist ausgefallen")
+                        return
                 self.msleep(15)
         finally:
-            u32.UnhookWindowsHookEx(self._haken)
+            if self._haken:
+                u32.UnhookWindowsHookEx(self._haken)
             self._haken = None
+
+    ERNEUERN_ALLE = 45.0      # Sekunden
 
     def _alter_weg(self, u32):
         """Falls der Haken nicht gesetzt werden kann: klassische Tastenkuerzel.
@@ -1065,6 +1081,70 @@ def fenster_nach_vorn(hwnd):
     finally:
         if angehaengt:
             u32.AttachThreadInput(eigen, fremd, False)
+
+
+def prozess_erhoeht(pid):
+    """True, wenn der Prozess mit Administratorrechten laeuft, False wenn nicht,
+    None wenn nicht feststellbar."""
+    k32, a32 = ctypes.windll.kernel32, ctypes.windll.advapi32
+    h = k32.OpenProcess(0x1000, False, int(pid))         # PROCESS_QUERY_LIMITED_INFORMATION
+    if not h:
+        return None
+    tok = wintypes.HANDLE()
+    if not a32.OpenProcessToken(h, 0x0008, ctypes.byref(tok)):   # TOKEN_QUERY
+        k32.CloseHandle(h)
+        return None
+
+    class _TE(ctypes.Structure):
+        _fields_ = [("erhoeht", wintypes.DWORD)]
+
+    te = _TE()
+    laenge = wintypes.DWORD()
+    ok = a32.GetTokenInformation(tok, 20, ctypes.byref(te), ctypes.sizeof(te),   # TokenElevation
+                                 ctypes.byref(laenge))
+    k32.CloseHandle(tok)
+    k32.CloseHandle(h)
+    return bool(te.erhoeht) if ok else None
+
+
+def spiel_laeuft_als_admin():
+    """True/False fuer das laufende Spiel, None wenn kein Spiel gefunden."""
+    hwnd = spielfenster_finden()
+    if not hwnd:
+        return None
+    pid = wintypes.DWORD()
+    ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    return prozess_erhoeht(pid.value)
+
+
+def selbst_admin():
+    try:
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:
+        return False
+
+
+SPERRE_GRIFF = None      # Handle der Einzelinstanz-Sperre, wird in main() gesetzt
+
+
+def als_admin_neu_starten():
+    """
+    Startet SC Info mit Administratorrechten neu (Windows fragt per UAC nach).
+    Noetig, wenn das Spiel als Administrator laeuft: Windows liefert einem
+    normalen Programm dann keine Tasten mehr, solange das Spiel den Fokus hat.
+    """
+    if getattr(sys, "frozen", False):
+        exe, params = sys.executable, ""
+    else:
+        exe, params = sys.executable, f'"{Path(__file__).resolve()}"'
+    # Sperre freigeben, sonst meldet die neue Instanz "laeuft bereits"
+    global SPERRE_GRIFF
+    if SPERRE_GRIFF:
+        ctypes.windll.kernel32.CloseHandle(SPERRE_GRIFF)
+        SPERRE_GRIFF = None
+    ergebnis = ctypes.windll.shell32.ShellExecuteW(None, "runas", exe, params, str(APP_DIR), 1)
+    protokoll(f"Neustart als Administrator angefordert: {'ok' if ergebnis > 32 else f'abgelehnt ({ergebnis})'}")
+    return ergebnis > 32
 
 
 def vordergrund_fenster():
@@ -1295,6 +1375,15 @@ class Fenster(QMainWindow):
         self._verlauf_zeichnen()
         self._status_setzen()
         self._waechter_starten()
+        protokoll(f"SC Info {VERSION} gestartet, als Administrator: {selbst_admin()}")
+
+        # Prueft regelmaessig, ob das Spiel als Administrator laeuft (dann kaemen
+        # keine Tasten an) und blendet in dem Fall den roten Knopf ein.
+        self._admin_gewarnt = False
+        self._admin_timer = QTimer(self)
+        self._admin_timer.timeout.connect(self._admin_pruefen)
+        self._admin_timer.start(15000)
+        QTimer.singleShot(3000, self._admin_pruefen)
 
     # ---------------------------------------------------------- Kopfzeile
     def _kopf(self):
@@ -1323,6 +1412,18 @@ class Fenster(QMainWindow):
         self.vorn_haken.toggled.connect(self._immer_vorn_setzen)
         oben.addWidget(self.vorn_haken)
         oben.addSpacing(6)
+        # Erscheint nur, wenn das Spiel als Administrator laeuft und SC Info nicht.
+        self.admin_knopf = self._knopf("Als Administrator neu starten", self._admin_neustart, haupt=True)
+        self.admin_knopf.setStyleSheet(
+            f"QPushButton{{background:{C_ROT};color:#fff;border:none;border-radius:7px;"
+            f"padding:8px 14px;font-size:13px;font-weight:600;}}"
+            f"QPushButton:hover{{background:#d64536;}}")
+        self.admin_knopf.setToolTip(
+            "Star Citizen laeuft als Administrator. Windows liefert einem normalen Programm\n"
+            "dann keine Tasten, solange das Spiel den Fokus hat. SC Info muss ebenfalls als\n"
+            "Administrator laufen - oder du startest das Spiel ohne Administratorrechte.")
+        self.admin_knopf.hide()
+        oben.addWidget(self.admin_knopf)
         oben.addWidget(self._knopf("Hilfe", self.hilfe_zeigen))
         oben.addWidget(self._knopf("Bereich festlegen", self.bereich_festlegen))
         oben.addWidget(self._knopf("Bild laden ...", self.bild_laden))
@@ -1894,6 +1995,7 @@ class Fenster(QMainWindow):
           <li><b>Werte fehlen:</b> Helm absetzen, dann unten ins Feld „Erkannter Text“ schauen. Fehlen ganze Zeilen, den Bereich neu festlegen.</li>
           <li><b>Bild ist schwarz:</b> Star Citizen im randlosen Fenstermodus laufen lassen (die übliche Einstellung).</li>
           <li><b>„Konsole ist nicht aufgegangen“:</b> Meist war die Konsole schon offen (dann schließt ^ sie) – einfach nochmal drücken. Oder du hast dich bewegt: kurz stillstehen.</li>
+          <li><b>Funktionstasten reagieren im Spiel nicht, die Knöpfe schon:</b> Dann läuft Star Citizen als Administrator. Windows liefert einem normalen Programm keine Tasten, solange das Spiel den Fokus hat. SC Info zeigt dafür oben einen roten Knopf „Als Administrator neu starten“ – oder du startest das Spiel ohne Administratorrechte.</li>
           <li><b>Alles andere:</b> Im SC-Info-Ordner liegt <i>sc_info.log</i>. Darin steht zu jedem Tastendruck, was passiert ist. Diese Datei mitschicken, wenn du um Hilfe fragst.</li>
         </ul>
         <p class="dim">Alles läuft lokal auf deinem PC – kein Bild, kein Wert geht ins Internet.</p>
@@ -1918,6 +2020,37 @@ class Fenster(QMainWindow):
         dlg.show()
         dlg.raise_()
         dlg.activateWindow()
+
+    # ---------------------------------------------------------- Administrator-Pruefung
+    def _admin_pruefen(self):
+        """Spiel als Administrator, SC Info nicht -> Tasten kommen nie an. Deutlich sagen."""
+        try:
+            spiel_admin = spiel_laeuft_als_admin()
+        except Exception:
+            spiel_admin = None
+        problem = bool(spiel_admin) and not selbst_admin()
+        if problem and not self._admin_gewarnt:
+            self._admin_gewarnt = True
+            self.admin_knopf.show()
+            self.status.setText("Star Citizen läuft als Administrator – Tasten kommen nicht an")
+            self.status.setStyleSheet(f"color:{C_ROT};font-size:12.5px;font-weight:700;border:none;")
+            self.unterzeile.setText(
+                "Star Citizen läuft mit Administratorrechten. Windows liefert einem normalen "
+                "Programm dann keine Tasten, solange das Spiel den Fokus hat – F6/F7/F9 und "
+                "Alt+M bleiben wirkungslos. Klick oben auf „Als Administrator neu starten“ "
+                "(Windows fragt einmal nach), oder starte das Spiel ohne Administratorrechte.")
+            protokoll("Spiel laeuft als Administrator, SC Info nicht - Tasten koennen nicht ankommen")
+        elif not problem and self._admin_gewarnt:
+            self._admin_gewarnt = False
+            self.admin_knopf.hide()
+            self._status_setzen()
+            protokoll("Administrator-Konflikt nicht mehr vorhanden")
+
+    def _admin_neustart(self):
+        if als_admin_neu_starten():
+            QApplication.quit()
+        else:
+            self.unterzeile.setText("Neustart als Administrator wurde abgebrochen.")
 
     def _immer_vorn_setzen(self, an):
         """Haekchen "Immer im Vordergrund": Fenster ueber dem Spiel halten."""
@@ -1964,7 +2097,8 @@ def main():
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
 
-    allein, _griff = einzelinstanz_sperre()
+    global SPERRE_GRIFF
+    allein, SPERRE_GRIFF = einzelinstanz_sperre()
     if not allein:
         vorhandenes_fenster_zeigen()
         QMessageBox.information(
