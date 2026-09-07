@@ -7,7 +7,7 @@ Anzeige) fotografiert, der Text lokal ausgelesen (RapidOCR, keine Cloud) und
 als Ampel-Bewertung aufgeschluesselt.
 """
 
-VERSION = "1.5.7"
+VERSION = "1.5.6"
 
 import ctypes
 import json
@@ -71,17 +71,6 @@ AMPEL = {"gruen": C_GRUEN, "gelb": C_GELB, "rot": C_ROT, "grau": C_GRAU, "blau":
 
 VK_TASTEN = {"F5": 0x74, "F6": 0x75, "F7": 0x76, "F8": 0x77,
              "F9": 0x78, "F10": 0x79, "F11": 0x7A, "F12": 0x7B}
-
-# "Keine": die Funktion bekommt keine Taste, SC Info faengt dann auch nichts
-# ab - das Spiel behaelt alle F-Tasten (Wunsch aus der Gilde).
-KEINE = "Keine"
-
-
-def taste_vk(name, tabelle, standard):
-    """Tastenname -> virtueller Tastencode; "Keine" -> 0 (wird nie ausgeloest)."""
-    if name == KEINE:
-        return 0
-    return tabelle.get(name, standard)
 
 # Alt + Taste: holt das Fenster nach vorn bzw. schickt es wieder weg.
 FENSTER_KOMBIS = {"Alt+M": 0x4D, "Alt+I": 0x49, "Alt+S": 0x53, "Alt+X": 0x58,
@@ -801,8 +790,7 @@ class TastenWaechter(QThread):
         self._letzte_fenster = 0.0
         # Taste -> Kennung. Bei doppelt vergebener Taste gewinnt der spaetere
         # Eintrag, also der komplette Ablauf.
-        self.zuordnung = {vk: k for vk, k in ((vk_messen, 1), (vk_aus, 3), (vk_ablauf, 2))
-                          if vk}                # 0 = "Keine" -> nicht abfangen
+        self.zuordnung = {vk_messen: 1, vk_aus: 3, vk_ablauf: 2}
         self._laufen = True
         self._letzte = 0.0
         self._rueckruf = None          # Referenz halten, sonst stuerzt der Haken ab
@@ -830,7 +818,7 @@ class TastenWaechter(QThread):
                     vk = daten.vkCode
                     # Alt + Fenstertaste: Fenster vor/zurueck. Bei gehaltenem Alt
                     # meldet Windows die Taste als "Sys"-Taste, Bit 0x20 = Alt.
-                    if self.vk_fenster and vk == self.vk_fenster and (daten.flags & 0x20):
+                    if vk == self.vk_fenster and (daten.flags & 0x20):
                         if wparam in (WM_KEYDOWN, WM_SYSKEYDOWN):
                             jetzt = time.time()
                             if jetzt - self._letzte_fenster >= 0.4:
@@ -890,8 +878,7 @@ class TastenWaechter(QThread):
         """Falls der Haken nicht gesetzt werden kann: klassische Tastenkuerzel.
         Die funktionieren ausserhalb des Spiels zuverlaessig, im Spiel meist nicht."""
         vks = {kennung: (0, vk) for vk, kennung in self.zuordnung.items()}   # ohne Doppelte
-        if self.vk_fenster:
-            vks[4] = (1, self.vk_fenster)                                      # 1 = MOD_ALT
+        vks[4] = (1, self.vk_fenster)                                          # 1 = MOD_ALT
         registriert = [k for k, (mod, vk) in vks.items()
                        if u32.RegisterHotKey(None, k, mod, vk)]
         if not registriert:
@@ -1189,11 +1176,7 @@ class AblaufThread(QThread):
     # Schwellen fuer den Bildvergleich (mittlere Helligkeitsaenderung, 0-255).
     # Gemessen: stillstehender Charakter ~1-2, laufender Charakter 30 und mehr.
     RUHE_MAX = 6.0            # darueber bewegt sich der Spieler -> nicht tippen
-    # Gemessen (07.09.): offene Konsole 7,5-12; verdeckte Konsole 4,2-4,7.
-    # Frueher 8,0 fest - drei echte Konsolenoeffnungen mit 7,5-7,7 wurden
-    # dadurch faelschlich abgewiesen. Jetzt 6,5, aber mindestens das
-    # Fuenffache des Ruhe-Werts (Bewegung darf nie als Konsole durchgehen).
-    KONSOLE_MIN = 6.5         # darunter ist nach dem Tastendruck nichts aufgegangen
+    KONSOLE_MIN = 8.0         # darunter ist nach dem Tastendruck nichts aufgegangen
 
     def run(self):
         if self.spiel_hwnd:
@@ -1243,9 +1226,9 @@ class AblaufThread(QThread):
             time.sleep(0.45)
             bild_c = self._bildprobe()
             aenderung = self._unterschied(bild_b, bild_c)
-            noetig = max(self.KONSOLE_MIN, 5 * ruhe)
-            protokoll(f"  Aenderung nach Konsolentaste {aenderung:.1f} (noetig {noetig:.1f})")
-            if aenderung < noetig:
+            protokoll(f"  Aenderung nach Konsolentaste {aenderung:.1f} "
+                      f"(noetig {max(self.KONSOLE_MIN, 4 * ruhe):.1f})")
+            if aenderung < max(self.KONSOLE_MIN, 4 * ruhe):
                 protokoll("  abgebrochen: Konsole nicht aufgegangen")
                 self.fehler.emit(
                     "Die Konsole ist nicht aufgegangen – es wurde nichts getippt. "
@@ -1457,7 +1440,7 @@ class Fenster(QMainWindow):
             l = QLabel(text)
             l.setStyleSheet(f"color:{C_DIM};font-size:12.5px;border:none;")
             box = QComboBox()
-            box.addItems([KEINE] + list(eintraege))
+            box.addItems(list(eintraege))
             box.setCurrentText(aktuell)
             box.setFixedWidth(breite)
             box.setStyleSheet(stil_wahl)
@@ -1482,9 +1465,6 @@ class Fenster(QMainWindow):
                                     self._taste_gewechselt,
                                     "Holt SC Info nach vorn oder schickt es wieder weg - "
                                     "für Spieler mit nur einem Bildschirm")
-        for box in (self.auto_wahl, self.taste_wahl, self.aus_wahl, self.fenster_wahl):
-            box.setItemData(0, "„Keine“: diese Funktion bekommt keine Taste – "
-                               "das Spiel behält sie.", Qt.ItemDataRole.ToolTipRole)
         konsole = QLabel("Konsole: ^ (links neben der 1)")
         konsole.setStyleSheet(f"color:{C_DIM};font-size:12.5px;border:none;")
         konsole.setToolTip("Die Spielkonsole oeffnet in Star Citizen immer mit ^ - "
@@ -1648,11 +1628,8 @@ class Fenster(QMainWindow):
         mess = self.einst.get("taste", "F9")
         aus = self.einst.get("taste_aus", "F7")
         kombi = self.einst.get("fenster_kombi", "Alt+M")
-        teile = [f"{t}: {was}" for t, was in ((auto, "Anzeige an + messen"),
-                                              (mess, "nur messen"), (aus, "Anzeige aus"),
-                                              (kombi, "Fenster vor/zurück")) if t != KEINE]
-        if not teile:
-            teile.append("keine Tasten belegt – Bedienung per Maus")
+        teile = [f"{auto}: Anzeige an + messen", f"{mess}: nur messen",
+                 f"{aus}: Anzeige aus", f"{kombi}: Fenster vor/zurück"]
         teile.append(f"Bereich {b[2]}x{b[3]}" if b else "kein Bereich festgelegt")
         self.status.setText(" · ".join(teile))
         self.status.setStyleSheet(f"color:{C_DIM};font-size:12.5px;border:none;")
@@ -1670,10 +1647,10 @@ class Fenster(QMainWindow):
         if self.waechter:
             self.waechter.stoppen()
             self.waechter.wait(800)
-        vk_mess = taste_vk(self.einst.get("taste", "F9"), VK_TASTEN, 0x78)
-        vk_auto = taste_vk(self.einst.get("taste_ablauf", "F6"), VK_TASTEN, 0x75)
-        vk_aus = taste_vk(self.einst.get("taste_aus", "F7"), VK_TASTEN, 0x76)
-        vk_fenster = taste_vk(self.einst.get("fenster_kombi", "Alt+M"), FENSTER_KOMBIS, 0x4D)
+        vk_mess = VK_TASTEN.get(self.einst.get("taste", "F9"), 0x78)
+        vk_auto = VK_TASTEN.get(self.einst.get("taste_ablauf", "F6"), 0x75)
+        vk_aus = VK_TASTEN.get(self.einst.get("taste_aus", "F7"), 0x76)
+        vk_fenster = FENSTER_KOMBIS.get(self.einst.get("fenster_kombi", "Alt+M"), 0x4D)
         self.waechter = TastenWaechter(vk_mess, vk_auto, vk_aus, vk_fenster)
         self.waechter.ausgeloest.connect(self._taste_gedrueckt)
         self.waechter.fehler.connect(self._tasten_problem)
@@ -1965,8 +1942,6 @@ class Fenster(QMainWindow):
         e = self.einst
         an, mess, aus = e.get("taste_ablauf", "F6"), e.get("taste", "F9"), e.get("taste_aus", "F7")
         kombi = e.get("fenster_kombi", "Alt+M")
-        an, mess, aus, kombi = ("– (keine Taste)" if t == KEINE else t
-                                for t in (an, mess, aus, kombi))
         html = f"""
         <style>
           body {{ font-family: Segoe UI, sans-serif; font-size: 13.5px; color: {C_TEXT}; }}
@@ -1987,7 +1962,7 @@ class Fenster(QMainWindow):
           <tr><td class="t">{aus}</td><td><b>Anzeige aus.</b> Schickt <i>r_displayinfo 0</i> – die Textanzeige im Spiel verschwindet.</td></tr>
           <tr><td class="t">{kombi}</td><td><b>Fenster vor/zurück.</b> Holt SC Info über das Spiel nach vorn; nochmal drücken schickt es weg und gibt dem Spiel den Fokus zurück. Für Spieler mit nur einem Bildschirm.</td></tr>
         </table>
-        <p class="dim">Die Spielkonsole öffnet SC Info mit <b>^</b> (links neben der 1) – das ist in Star Citizen fest. Alle anderen Tasten sind oben im Fenster umstellbar. Die gewählten Tasten gehören SC Info allein – das Spiel bekommt sie nicht mehr. Wer eine Funktion nicht braucht, wählt <b>„Keine“</b> – dann bleibt die Taste beim Spiel; die Knöpfe im Fenster gehen weiterhin.</p>
+        <p class="dim">Die Spielkonsole öffnet SC Info mit <b>^</b> (links neben der 1) – das ist in Star Citizen fest. Alle anderen Tasten sind oben im Fenster umstellbar. Die gewählten Tasten gehören SC Info allein – das Spiel bekommt sie nicht mehr.</p>
 
         <h2>Einmalig einrichten</h2>
         <ol>
@@ -2010,7 +1985,7 @@ class Fenster(QMainWindow):
           <tr><td class="t">Paketverlust</td><td>Verlorene Datenpakete – die Ursache vieler Ruckler.</td></tr>
           <tr><td class="t">Shard</td><td>Spieler in deiner Spielwelt (Grenze rund 500) und davon auf deinem Server-Knoten.</td></tr>
         </table>
-        <p>Daraus entsteht die Note von 0 bis 10 mit klarer Empfehlung: <b>bleiben</b> oder <b>neu joinen</b>. Gewichtung: Server-FPS 40 %, Ping 25 %, Hitches 20 %, Paketverlust 10 %, Shard-Auslastung 10 %. Ein Server mit 30 FPS, 40 ms Ping und 0 Hitches landet bei rund 9,5 – Ruckeln trotz guter Note kommt dann vom eigenen Rechner (Grafiklast, Client-FPS), nicht vom Server. Die Ampel je Zeile: grün = gut, gelb = mittel, rot = schlecht, grau = nicht gelesen, <b>blau = nur Information</b> (Region, Standort, Bandbreite – wird nicht bewertet).</p>
+        <p>Daraus entsteht die Note von 0 bis 10 mit klarer Empfehlung: <b>bleiben</b> oder <b>neu joinen</b>. Die Ampel je Zeile: grün = gut, gelb = mittel, rot = schlecht, grau = nicht gelesen, <b>blau = nur Information</b> (Region, Standort, Bandbreite – wird nicht bewertet).</p>
 
         <h2>Sicherheit beim Tippen</h2>
         <p>Getippt wird <b>nur</b>, wenn Star Citizen tatsächlich im Vordergrund ist – und <b>nur</b>, wenn die Konsole nachweislich aufgegangen ist. Sonst würden die Buchstaben des Befehls zu Spielbefehlen (Inventar, springen, Waffe). Dafür beim Drücken kurz stillstehen. Ist SC Info selbst gerade vorn, holt es das Spiel für die Tastenfolge kurz nach vorn und kommt danach zurück.</p>

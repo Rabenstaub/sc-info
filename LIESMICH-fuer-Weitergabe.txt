@@ -115,8 +115,9 @@ in Star Citizen fest und braucht keine Einstellung.
 
 WICHTIG: Die gewaehlten Tasten gehoeren dann SC Info allein - das
 Spiel bekommt sie nicht mehr. Liegt bei dir also etwas Wichtiges auf
-F6, F7, F9 oder Alt+M, waehle oben eine andere Taste. (F5 ist bewusst NICHT
-voreingestellt: dort liegt in Star Citizen das Pin-System.)
+F6, F7, F9 oder Alt+M, waehle oben eine andere Taste - oder "Keine", dann
+bekommt diese Funktion gar keine Taste und das Spiel behaelt sie. (F5 ist
+bewusst NICHT voreingestellt: dort liegt in Star Citizen das Pin-System.)
 
 "Hilfe"           - zeigt diese Bedienung im Programm, mit den gerade
                     eingestellten Tasten.
