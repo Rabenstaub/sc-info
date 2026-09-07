@@ -22,3 +22,6 @@ icon_vorschau.png
 
 # Private Anleitung fuer den Betreiber, nicht fuers Repository
 ANLEITUNG-Veroeffentlichen.md
+
+# Sicherungskopien
+*.bak_*
