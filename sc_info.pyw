@@ -7,7 +7,7 @@ Anzeige) fotografiert, der Text lokal ausgelesen (RapidOCR, keine Cloud) und
 als Ampel-Bewertung aufgeschluesselt.
 """
 
-VERSION = "1.5.8"
+VERSION = "1.5.9"
 
 import ctypes
 import json
@@ -294,8 +294,9 @@ def werte_auslesen(text):
 
     # --- Shard-Bevoelkerung und eigener Server-Knoten -------------
     # "pop, [shard 482, srv 25]" - 482 Spieler auf der Shard, 25 auf dem Knoten.
-    w["shard_spieler"] = _zahl(_suche(n, r"shard[:\s]+(\d{1,4})\b"))
-    w["srv_spieler"] = _zahl(_suche(n, r"\bsrv[:\s]+(\d{1,4})\b"))
+    # "srv" liest die Texterkennung gern als "5rv", "shard" als "5hard".
+    w["shard_spieler"] = _zahl(_suche(n, r"[s5]hard[:\s]+(\d{1,4})\b"))
+    w["srv_spieler"] = _zahl(_suche(n, r"(?<![a-z])[s5]rv[:\s]+(\d{1,4})\b"))
 
     # --- Region aus dem Servernamen ------------------------------
     code = _suche(n, r"pub[-_]([a-z]{2,4}\d[a-z]?)")
@@ -327,7 +328,8 @@ def werte_auslesen(text):
     # Wert nur, wenn direkt "BwIn" folgt - so wie im echten Format. Verliest die
     # Erkennung die Zahl selbst (z.B. "loss 6.8e"), passt das Muster NICHT mehr,
     # und es bleibt lieber leer, statt einen erfundenen Paketverlust zu melden.
-    w["loss"] = _zahl(_suche(n, r"\blo[s5]{2}[:\s]*(" + zahl + r"{1,6})\s*(?:%|bw\s*in)"))
+    w["loss"] = _zahl(_suche(
+        n, r"(?<![a-z])[l1i|][o0][s5]{2}[:\s]*(" + zahl + r"{1,6})\s*(?:%|bw\s*[i1l]n)"))
     if w["loss"] is not None and w["loss"] > 50:
         w["loss"] = None                       # unglaubwuerdig - sicher ein Lesefehler
 
@@ -436,7 +438,10 @@ def bewerten(w):
 
     # --- Paketverlust: einzelne verlorene Pakete sind der Grund fuer Ruckler.
     v = w.get("loss")
-    if v is not None:
+    if v is None:
+        eintrag("Paketverlust", "nicht erkannt", "grau",
+                "Wert war im Bild nicht lesbar - fliesst nicht in die Note ein.")
+    else:
         if v <= 0.05:
             a, e, pt = "gruen", "Keine Paketverluste.", 10
         elif v <= 1.0:
@@ -1907,6 +1912,17 @@ class Fenster(QMainWindow):
         self.rohtext.setPlainText(text or "(nichts erkannt)")
 
         w = werte_auslesen(text)
+        # Fehlt ein Kernwert, wandert der erkannte Text ins Protokoll - so
+        # reicht bei Rueckfragen aus der Gilde die sc_info.log, ohne dass der
+        # Nutzer das Textfeld abschreiben muss.
+        fehlend = [k for k in ("sfps", "ping", "hitches", "loss", "shard_spieler",
+                               "srv_spieler", "region", "entities", "fps")
+                   if w.get(k) is None]
+        if fehlend:
+            protokoll(f"  nicht gelesen: {', '.join(fehlend)} - erkannter Text:")
+            for zeile in (text or "").splitlines():
+                if zeile.strip():
+                    protokoll(f"    | {zeile.rstrip()}")
         b = bewerten(w)
         self._ergebnis_zeigen(w, b, sicherheit)
 
