@@ -7,7 +7,7 @@ Anzeige) fotografiert, der Text lokal ausgelesen (RapidOCR, keine Cloud) und
 als Ampel-Bewertung aufgeschluesselt.
 """
 
-VERSION = "1.5.7"
+VERSION = "1.5.8"
 
 import ctypes
 import json
@@ -313,7 +313,10 @@ def werte_auslesen(text):
     # --- Server: FPS, Rechenzeit je Tick, Aussetzer ---------------
     w["sfps"] = _zahl(_suche(n, r"(?:sfps|server\s*fps|serverfps)[:\s]*(" + zahl + r"{1,6})"))
     w["server_ms"] = _zahl(_suche(
-        n, r"(?:sfps|server\s*fps|serverfps)[^\n]*?[-.,:]\s*(" + zahl + r"{1,6})\s*ms"))
+        n, r"(?:sfps|server\s*fps|serverfps)[^\n]*?\]\s*[^0-9a-z\n]{0,4}(" + zahl + r"{1,6})\s*ms"))
+    if w["server_ms"] is None:                 # Klammer nicht gelesen -> altes Muster
+        w["server_ms"] = _zahl(_suche(
+            n, r"(?:sfps|server\s*fps|serverfps)[^\n]*?[-.,:]\s*(" + zahl + r"{1,6})\s*ms"))
     w["hitches"] = _zahl(_suche(n, r"hitch\w{0,3}[:\s]*([0-9oOlIS@]{1,4})"))
 
     # --- Netz ------------------------------------------------------
@@ -328,9 +331,9 @@ def werte_auslesen(text):
     if w["loss"] is not None and w["loss"] > 50:
         w["loss"] = None                       # unglaubwuerdig - sicher ein Lesefehler
 
-    t = re.search(r"bw\s*in[:\s]*(" + zahl + r"{1,9})\s*([kmg]?bps)", n)
+    t = re.search(r"bw\s*[i1l]n[:\s]*(" + zahl + r"{1,9})\s*([kmg]?bp[s5])", n)
     w["bw_in"] = _bandbreite(t.group(1), t.group(2)) if t else None
-    t = re.search(r"bw\s*out[:\s]*(" + zahl + r"{1,9})\s*([kmg]?bps)", n)
+    t = re.search(r"bw\s*[o0]ut[:\s]*(" + zahl + r"{1,9})\s*([kmg]?bp[s5])", n)
     w["bw_out"] = _bandbreite(t.group(1), t.group(2)) if t else None
 
     # --- Simulationslast des Servers (RL-Zeile, nicht die Client-Zeile)
@@ -1191,8 +1194,9 @@ class AblaufThread(QThread):
     RUHE_MAX = 6.0            # darueber bewegt sich der Spieler -> nicht tippen
     # Gemessen (07.09.): offene Konsole 7,5-12; verdeckte Konsole 4,2-4,7.
     # Frueher 8,0 fest - drei echte Konsolenoeffnungen mit 7,5-7,7 wurden
-    # dadurch faelschlich abgewiesen. Jetzt 6,5, aber mindestens das
-    # Fuenffache des Ruhe-Werts (Bewegung darf nie als Konsole durchgehen).
+    # dadurch faelschlich abgewiesen. Jetzt 6,5, aber mindestens das Dreifache
+    # des Ruhe-Werts plus 1 (eine gleichmaessige Bewegung waechst im laengeren
+    # zweiten Messfenster auf etwa das Doppelte - darf nie als Konsole gelten).
     KONSOLE_MIN = 6.5         # darunter ist nach dem Tastendruck nichts aufgegangen
 
     def run(self):
@@ -1243,7 +1247,7 @@ class AblaufThread(QThread):
             time.sleep(0.45)
             bild_c = self._bildprobe()
             aenderung = self._unterschied(bild_b, bild_c)
-            noetig = max(self.KONSOLE_MIN, 5 * ruhe)
+            noetig = max(self.KONSOLE_MIN, 3 * ruhe + 1)
             protokoll(f"  Aenderung nach Konsolentaste {aenderung:.1f} (noetig {noetig:.1f})")
             if aenderung < noetig:
                 protokoll("  abgebrochen: Konsole nicht aufgegangen")
